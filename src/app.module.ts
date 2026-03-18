@@ -44,9 +44,16 @@ import { LeaderboardEntry } from './entities/leaderboard.entity';
           Assessment, AssessmentQuestion, AssessmentAttempt,
           Certificate, Subscription, LeaderboardEntry,
         ],
-        synchronize: process.env.NODE_ENV !== 'production',
-        logging: process.env.NODE_ENV !== 'production',
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+        synchronize: true, // auto-create tables on startup
+        logging: false,
+        ssl: { rejectUnauthorized: false }, // required for Supabase + Railway
+        extra: {
+          // Force IPv4 — prevents ENETUNREACH on IPv6-only Railway containers
+          family: 4,
+          // Connection pool settings for Supabase pooler
+          max: 10,
+          connectionTimeoutMillis: 10000,
+        },
       }),
       inject: [ConfigService],
     }),
