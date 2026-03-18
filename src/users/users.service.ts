@@ -1,56 +1,65 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { User, UserRole } from '../entities/user.entity';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectRepository(User)
-    private userRepo: Repository<User>,
-  ) {}
+  constructor(@InjectRepository(User) private repo: Repository<User>) {}
 
-  async findAll(tenantId?: string): Promise<User[]> {
+  async findAll(tenantId?: string) {
     const where = tenantId ? { tenantId } : {};
-    return this.userRepo.find({ where, relations: ['tenant'] });
+    return this.repo.find({ where, select: ['id', 'firstName', 'lastName', 'email', 'role', 'avatarUrl', 'isActive', 'createdAt', 'points', 'streak'] });
   }
 
-  async findOne(id: string): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id }, relations: ['tenant'] });
-    if (!user) throw new NotFoundException(`User ${id} not found`);
+  async findOne(id: string) {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { email } });
+  async findByEmail(email: string) {
+    return this.repo.findOne({ where: { email } });
   }
 
-  async create(data: Partial<User>): Promise<User> {
-    const user = this.userRepo.create(data);
-    return this.userRepo.save(user);
+  async create(data: { firstName: string; lastName: string; email: string; password?: string; passwordHash?: string; role?: UserRole; tenantId?: string }) {
+    const existing = await this.findByEmail(data.email);
+    if (existing) throw new ConflictException('Email already registered');
+    let passwordHash = data.passwordHash;
+    if (!passwordHash && data.password) {
+      passwordHash = await bcrypt.hash(data.password, 12);
+    }
+    const { password, ...rest } = data;
+    const user = this.repo.create({ ...rest, passwordHash });
+    return this.repo.save(user);
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
-    await this.findOne(id);
-    await this.userRepo.update(id, dto);
+  async update(id: string, data: Partial<User>) {
+    await this.repo.update(id, data);
     return this.findOne(id);
   }
 
-  async remove(id: string): Promise<void> {
+  async updateRefreshToken(id: string, refreshToken: string | null) {
+    const hashed = refreshToken ? await bcrypt.hash(refreshToken, 10) : null;
+    await this.repo.update(id, { refreshToken: hashed ?? undefined });
+  }
+
+  async remove(id: string) {
     await this.findOne(id);
-    await this.userRepo.delete(id);
+    await this.repo.delete(id);
+    return { message: 'User deleted' };
   }
 
-  async updateRefreshToken(id: string, refreshToken: string | null): Promise<void> {
-    await this.userRepo.update(id, { refreshToken: refreshToken ?? undefined });
+  async validatePassword(plain: string, hashed: string) {
+    return bcrypt.compare(plain, hashed);
   }
 
-  async updateLastLogin(id: string): Promise<void> {
-    await this.userRepo.update(id, { lastLoginAt: new Date() });
+  async updateLastLogin(id: string) {
+    await this.repo.update(id, { lastLoginAt: new Date() });
   }
 
-  async updatePoints(id: string, points: number): Promise<void> {
-    await this.userRepo.increment({ id }, 'points', points);
+  async updatePoints(id: string, points: number) {
+    await this.repo.increment({ id }, 'points', points);
   }
 }

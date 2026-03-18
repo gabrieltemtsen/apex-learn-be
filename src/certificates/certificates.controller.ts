@@ -19,7 +19,7 @@ export class CertificatesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get my certificates' })
   getMyCertificates(@Request() req: any) {
-    return this.certificatesService.findMyCertificates(req.user.id);
+    return this.certificatesService.findMyCertificates(req.user.sub);
   }
 
   @Post('generate/:courseId')
@@ -27,7 +27,7 @@ export class CertificatesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Generate certificate for completed course' })
   generate(@Param('courseId') courseId: string, @Body() dto: GenerateCertDto, @Request() req: any) {
-    return this.certificatesService.generate(req.user.id, courseId, dto.tenantId);
+    return this.certificatesService.generate(req.user.sub, courseId, dto.tenantId);
   }
 
   @Get('verify/:certificateNumber')

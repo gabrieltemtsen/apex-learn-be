@@ -27,12 +27,12 @@ export class ProgressController {
   @Post()
   @ApiOperation({ summary: 'Mark a lesson as complete' })
   markComplete(@Body() dto: MarkCompleteDto, @Request() req: any) {
-    return this.progressService.markComplete(req.user.id, dto.lessonId, dto.courseId);
+    return this.progressService.markComplete(req.user.sub, dto.lessonId, dto.courseId);
   }
 
   @Get('course/:courseId')
   @ApiOperation({ summary: 'Get progress for a course' })
   getCourseProgress(@Param('courseId') courseId: string, @Request() req: any) {
-    return this.progressService.getCourseProgress(req.user.id, courseId);
+    return this.progressService.getCourseProgress(req.user.sub, courseId);
   }
 }

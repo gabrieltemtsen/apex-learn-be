@@ -2,62 +2,62 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Progress } from '../entities/progress.entity';
-import { LessonsService } from '../lessons/lessons.service';
-import { EnrollmentsService } from '../enrollments/enrollments.service';
+import { Lesson } from '../entities/lesson.entity';
+import { Enrollment, EnrollmentStatus } from '../entities/enrollment.entity';
+import { User } from '../entities/user.entity';
 
 @Injectable()
 export class ProgressService {
   constructor(
     @InjectRepository(Progress)
-    private progressRepo: Repository<Progress>,
-    private lessonsService: LessonsService,
-    private enrollmentsService: EnrollmentsService,
+    private repo: Repository<Progress>,
+    @InjectRepository(Lesson)
+    private lessonsRepo: Repository<Lesson>,
+    @InjectRepository(Enrollment)
+    private enrollmentsRepo: Repository<Enrollment>,
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
   ) {}
 
   async markComplete(userId: string, lessonId: string, courseId: string): Promise<Progress> {
-    let progress = await this.progressRepo.findOne({ where: { userId, lessonId } });
-    if (progress) {
-      if (!progress.completed) {
-        await this.progressRepo.update(progress.id, { completed: true, completedAt: new Date() });
-        progress = (await this.progressRepo.findOne({ where: { userId, lessonId } })) as Progress;
-        await this.updateCourseProgress(userId, courseId);
-      }
-      return progress;
-    }
+    const existing = await this.repo.findOne({ where: { userId, lessonId } });
+    if (existing?.completed) return existing;
 
-    const newProgress = this.progressRepo.create({
-      userId,
-      lessonId,
-      courseId,
-      completed: true,
-      completedAt: new Date(),
-    });
-    const saved = await this.progressRepo.save(newProgress);
-    await this.updateCourseProgress(userId, courseId);
-    return saved;
+    const progress = existing
+      ? await this.repo.save({ ...existing, completed: true, completedAt: new Date() })
+      : await this.repo.save(
+          this.repo.create({ userId, lessonId, courseId, completed: true, completedAt: new Date() }),
+        );
+
+    // Update enrollment progress percentage
+    const totalLessons = await this.lessonsRepo.count({ where: { courseId, isPublished: true } });
+    const completedLessons = await this.repo.count({ where: { userId, courseId, completed: true } });
+    const percent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+    await this.enrollmentsRepo.update(
+      { userId, courseId },
+      {
+        progressPercent: percent,
+        ...(percent === 100
+          ? { status: EnrollmentStatus.COMPLETED, completedAt: new Date() }
+          : {}),
+      },
+    );
+
+    // Award points to user
+    await this.usersRepo.increment({ id: userId }, 'points', 10);
+
+    return progress;
   }
 
   async getCourseProgress(userId: string, courseId: string) {
-    const totalLessons = await this.lessonsService.countByCourse(courseId);
-    const completedLessons = await this.progressRepo.count({
-      where: { userId, courseId, completed: true },
-    });
-    const progressItems = await this.progressRepo.find({
-      where: { userId, courseId },
-      relations: ['lesson'],
-    });
-    const percent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-
+    const completed = await this.repo.find({ where: { userId, courseId, completed: true } });
+    const total = await this.lessonsRepo.count({ where: { courseId, isPublished: true } });
     return {
-      totalLessons,
-      completedLessons,
-      progressPercent: percent,
-      progressItems,
+      completedLessonIds: completed.map((p) => p.lessonId),
+      completedCount: completed.length,
+      totalCount: total,
+      percent: total ? Math.round((completed.length / total) * 100) : 0,
     };
-  }
-
-  private async updateCourseProgress(userId: string, courseId: string): Promise<void> {
-    const { progressPercent } = await this.getCourseProgress(userId, courseId);
-    await this.enrollmentsService.updateProgress(userId, courseId, progressPercent);
   }
 }

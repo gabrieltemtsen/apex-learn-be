@@ -26,7 +26,7 @@ export class UsersController {
   @Get('me/profile')
   @ApiOperation({ summary: 'Get my profile' })
   getProfile(@Request() req: any) {
-    return this.usersService.findOne(req.user.id);
+    return this.usersService.findOne(req.user.sub);
   }
 
   @Get(':id')

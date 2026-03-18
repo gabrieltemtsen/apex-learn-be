@@ -1,10 +1,10 @@
-import { Controller, Post, Get, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { JwtRefreshGuard } from './jwt-refresh.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -18,39 +18,33 @@ export class AuthController {
   }
 
   @Post('login')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(200)
   @ApiOperation({ summary: 'Login with email and password' })
-  async login(@Body() dto: LoginDto, @Request() req: any) {
-    const user = await this.authService.validateUser(dto.email, dto.password);
-    if (!user) {
-      return { statusCode: 401, message: 'Invalid credentials' };
-    }
-    return this.authService.login(user);
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.email, dto.password);
   }
 
   @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard('jwt-refresh'))
+  @UseGuards(JwtRefreshGuard)
+  @HttpCode(200)
   @ApiOperation({ summary: 'Refresh access token' })
-  async refresh(@Request() req: any) {
-    return this.authService.refresh(req.user);
+  async refresh(@Req() req: any) {
+    return this.authService.refresh(req.user.sub, req.user.refreshToken);
   }
 
   @Post('logout')
-  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout user' })
-  async logout(@Request() req: any) {
-    return this.authService.logout(req.user.id);
+  async logout(@Req() req: any) {
+    return this.authService.logout(req.user.sub);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user' })
-  async me(@Request() req: any) {
-    const { passwordHash, refreshToken, ...user } = req.user;
-    return user;
+  @ApiOperation({ summary: 'Get current user profile' })
+  async getMe(@Req() req: any) {
+    return this.authService.getMe(req.user.sub);
   }
 }

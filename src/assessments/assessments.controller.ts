@@ -64,12 +64,12 @@ export class AssessmentsController {
   @Post(':id/attempt')
   @ApiOperation({ summary: 'Submit assessment attempt' })
   submitAttempt(@Param('id') id: string, @Body() dto: SubmitAttemptDto, @Request() req: any) {
-    return this.assessmentsService.submitAttempt(id, req.user.id, dto);
+    return this.assessmentsService.submitAttempt(id, req.user.sub, dto);
   }
 
   @Get(':id/results')
   @ApiOperation({ summary: 'Get assessment results for current user' })
   getResults(@Param('id') id: string, @Request() req: any) {
-    return this.assessmentsService.getResults(id, req.user.id);
+    return this.assessmentsService.getResults(id, req.user.sub);
   }
 }

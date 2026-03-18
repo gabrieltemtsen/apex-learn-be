@@ -12,12 +12,13 @@ export class CoursesService {
     private courseRepo: Repository<Course>,
   ) {}
 
-  async findAll(filters: { tenantId?: string; category?: string; level?: string; search?: string }): Promise<Course[]> {
+  async findAll(filters: { tenantId?: string; category?: string; level?: string; search?: string; isPublished?: boolean }): Promise<Course[]> {
     const where: any = {};
     if (filters.tenantId) where.tenantId = filters.tenantId;
     if (filters.category) where.category = filters.category;
     if (filters.level) where.level = filters.level;
     if (filters.search) where.title = Like(`%${filters.search}%`);
+    if (filters.isPublished !== undefined) where.isPublished = filters.isPublished;
 
     return this.courseRepo.find({
       where,
@@ -44,9 +45,14 @@ export class CoursesService {
     return course;
   }
 
-  async create(dto: CreateCourseDto, instructorId: string): Promise<Course> {
+  async create(dto: CreateCourseDto, instructorId: string, tenantId?: string): Promise<Course> {
     const slug = dto.slug || this.generateSlug(dto.title);
-    const course = this.courseRepo.create({ ...dto, instructorId, slug });
+    const course = this.courseRepo.create({
+      ...dto,
+      instructorId,
+      tenantId: tenantId || dto.tenantId,
+      slug,
+    });
     return this.courseRepo.save(course);
   }
 
@@ -72,6 +78,10 @@ export class CoursesService {
   }
 
   private generateSlug(title: string): string {
-    return title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now();
+    return (
+      title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') +
+      '-' +
+      Date.now().toString(36)
+    );
   }
 }

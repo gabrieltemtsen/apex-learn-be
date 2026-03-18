@@ -27,13 +27,13 @@ export class EnrollmentsController {
   @Post()
   @ApiOperation({ summary: 'Enroll in a course' })
   enroll(@Body() dto: EnrollDto, @Request() req: any) {
-    return this.enrollmentsService.enroll(req.user.id, dto.courseId, dto.tenantId);
+    return this.enrollmentsService.enroll(req.user.sub, dto.courseId, dto.tenantId);
   }
 
   @Get('my')
   @ApiOperation({ summary: 'Get my enrollments' })
   getMyEnrollments(@Request() req: any) {
-    return this.enrollmentsService.findMyEnrollments(req.user.id);
+    return this.enrollmentsService.getUserEnrollments(req.user.sub);
   }
 
   @Get('course/:courseId')
@@ -45,6 +45,6 @@ export class EnrollmentsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Drop a course enrollment' })
   drop(@Param('id') id: string, @Request() req: any) {
-    return this.enrollmentsService.drop(id, req.user.id);
+    return this.enrollmentsService.drop(req.user.sub, id);
   }
 }

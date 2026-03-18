@@ -19,13 +19,16 @@ export class CoursesController {
   @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'level', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'isPublished', required: false })
   findAll(
     @Query('tenantId') tenantId?: string,
     @Query('category') category?: string,
     @Query('level') level?: string,
     @Query('search') search?: string,
+    @Query('isPublished') isPublished?: string,
   ) {
-    return this.coursesService.findAll({ tenantId, category, level, search });
+    const isPublishedBool = isPublished !== undefined ? isPublished === 'true' : undefined;
+    return this.coursesService.findAll({ tenantId, category, level, search, isPublished: isPublishedBool });
   }
 
   @Get(':id')
@@ -40,7 +43,7 @@ export class CoursesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a course' })
   create(@Body() dto: CreateCourseDto, @Request() req: any) {
-    return this.coursesService.create(dto, req.user.id);
+    return this.coursesService.create(dto, req.user.sub, req.user.tenantId);
   }
 
   @Patch(':id')

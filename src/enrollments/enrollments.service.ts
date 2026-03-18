@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Enrollment, EnrollmentStatus } from '../entities/enrollment.entity';
@@ -8,47 +8,56 @@ import { CoursesService } from '../courses/courses.service';
 export class EnrollmentsService {
   constructor(
     @InjectRepository(Enrollment)
-    private enrollmentRepo: Repository<Enrollment>,
+    private repo: Repository<Enrollment>,
     private coursesService: CoursesService,
   ) {}
 
   async enroll(userId: string, courseId: string, tenantId: string): Promise<Enrollment> {
-    const existing = await this.enrollmentRepo.findOne({ where: { userId, courseId } });
-    if (existing) throw new ConflictException('Already enrolled in this course');
-    const enrollment = this.enrollmentRepo.create({ userId, courseId, tenantId });
-    const saved = await this.enrollmentRepo.save(enrollment);
+    // Check if already enrolled — idempotent
+    const existing = await this.repo.findOne({ where: { userId, courseId } });
+    if (existing) return existing;
+
+    // Increment course enrollment count
     await this.coursesService.incrementEnrollment(courseId);
-    return saved;
+
+    return this.repo.save(this.repo.create({ userId, courseId, tenantId, status: EnrollmentStatus.ACTIVE }));
   }
 
-  findMyEnrollments(userId: string): Promise<Enrollment[]> {
-    return this.enrollmentRepo.find({
+  async getUserEnrollments(userId: string): Promise<Enrollment[]> {
+    return this.repo.find({
       where: { userId },
       relations: ['course', 'course.instructor'],
+      order: { enrolledAt: 'DESC' },
     });
   }
 
+  /** Alias kept for internal use by ProgressService */
+  findMyEnrollments(userId: string): Promise<Enrollment[]> {
+    return this.getUserEnrollments(userId);
+  }
+
   findByCourse(courseId: string): Promise<Enrollment[]> {
-    return this.enrollmentRepo.find({
+    return this.repo.find({
       where: { courseId },
       relations: ['user'],
     });
   }
 
-  async drop(id: string, userId: string): Promise<void> {
-    const enrollment = await this.enrollmentRepo.findOne({ where: { id } });
-    if (!enrollment) throw new NotFoundException(`Enrollment ${id} not found`);
-    await this.enrollmentRepo.update(id, { status: EnrollmentStatus.DROPPED });
+  async drop(userId: string, enrollmentId: string): Promise<{ message: string }> {
+    const enrollment = await this.repo.findOne({ where: { id: enrollmentId, userId } });
+    if (!enrollment) throw new NotFoundException('Enrollment not found');
+    await this.repo.update(enrollmentId, { status: EnrollmentStatus.DROPPED });
+    return { message: 'Dropped successfully' };
   }
 
   async updateProgress(userId: string, courseId: string, progressPercent: number): Promise<void> {
-    const enrollment = await this.enrollmentRepo.findOne({ where: { userId, courseId } });
+    const enrollment = await this.repo.findOne({ where: { userId, courseId } });
     if (!enrollment) return;
     const update: any = { progressPercent };
     if (progressPercent >= 100) {
       update.status = EnrollmentStatus.COMPLETED;
       update.completedAt = new Date();
     }
-    await this.enrollmentRepo.update(enrollment.id, update);
+    await this.repo.update(enrollment.id, update);
   }
 }
