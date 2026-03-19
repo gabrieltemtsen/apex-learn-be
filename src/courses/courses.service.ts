@@ -4,12 +4,14 @@ import { Repository, Like } from 'typeorm';
 import { Course } from '../entities/course.entity';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { TenantsService } from '../tenants/tenants.service';
 
 @Injectable()
 export class CoursesService {
   constructor(
     @InjectRepository(Course)
     private courseRepo: Repository<Course>,
+    private tenantsService: TenantsService,
   ) {}
 
   async findAll(filters: { tenantId?: string; category?: string; level?: string; search?: string; isPublished?: boolean; instructorId?: string }): Promise<Course[]> {
@@ -48,10 +50,14 @@ export class CoursesService {
 
   async create(dto: CreateCourseDto, instructorId: string, tenantId?: string): Promise<Course> {
     const slug = dto.slug || this.generateSlug(dto.title);
+
+    // Resolve tenantId: caller → dto → default tenant (auto-created if needed)
+    const resolvedTenantId = tenantId || dto.tenantId || await this.tenantsService.getOrCreateDefault();
+
     const course = this.courseRepo.create({
       ...dto,
       instructorId,
-      tenantId: tenantId || dto.tenantId,
+      tenantId: resolvedTenantId,
       slug,
     });
     return this.courseRepo.save(course);

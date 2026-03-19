@@ -2,7 +2,7 @@ import { Controller, Post, Get, Delete, Body, Param, UseGuards, Request } from '
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { EnrollmentsService } from './enrollments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 class EnrollDto {
@@ -11,10 +11,10 @@ class EnrollDto {
   @IsString()
   courseId: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false, description: 'Optional — auto-resolved from course if omitted' })
+  @IsOptional()
   @IsString()
-  tenantId: string;
+  tenantId?: string;
 }
 
 @ApiTags('enrollments')

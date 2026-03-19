@@ -18,6 +18,13 @@ export class TenantsController {
     return this.tenantsService.findAll();
   }
 
+  @Get('default')
+  @ApiOperation({ summary: 'Get the platform default tenant (public)' })
+  async getDefault() {
+    const id = await this.tenantsService.getOrCreateDefault();
+    return { id };
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Get tenant by slug (public)' })
   findBySlug(@Param('slug') slug: string) {

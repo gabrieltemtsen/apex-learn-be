@@ -13,10 +13,10 @@ export class CreateCourseDto {
   @IsString()
   description: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  tenantId: string;
+  tenantId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -12,15 +12,18 @@ export class EnrollmentsService {
     private coursesService: CoursesService,
   ) {}
 
-  async enroll(userId: string, courseId: string, tenantId: string): Promise<Enrollment> {
+  async enroll(userId: string, courseId: string, tenantId?: string): Promise<Enrollment> {
     // Check if already enrolled — idempotent
     const existing = await this.repo.findOne({ where: { userId, courseId } });
     if (existing) return existing;
 
+    // Auto-resolve tenantId from the course if not provided
+    const resolvedTenantId = tenantId || (await this.coursesService.findOne(courseId)).tenantId;
+
     // Increment course enrollment count
     await this.coursesService.incrementEnrollment(courseId);
 
-    return this.repo.save(this.repo.create({ userId, courseId, tenantId, status: EnrollmentStatus.ACTIVE }));
+    return this.repo.save(this.repo.create({ userId, courseId, tenantId: resolvedTenantId, status: EnrollmentStatus.ACTIVE }));
   }
 
   async getUserEnrollments(userId: string): Promise<Enrollment[]> {

@@ -1,15 +1,15 @@
 import { Controller, Get, Post, Param, Res, UseGuards, Request, Body, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CertificatesService } from './certificates.service';
 import { PdfService } from './pdf.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 class GenerateCertDto {
-  @ApiProperty() @IsNotEmpty() @IsString() tenantId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() tenantId?: string;
 }
 
 @ApiTags('certificates')
