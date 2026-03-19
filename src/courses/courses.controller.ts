@@ -20,15 +20,31 @@ export class CoursesController {
   @ApiQuery({ name: 'level', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'isPublished', required: false })
+  @ApiQuery({ name: 'instructorId', required: false })
   findAll(
     @Query('tenantId') tenantId?: string,
     @Query('category') category?: string,
     @Query('level') level?: string,
     @Query('search') search?: string,
     @Query('isPublished') isPublished?: string,
+    @Query('instructorId') instructorId?: string,
   ) {
     const isPublishedBool = isPublished !== undefined ? isPublished === 'true' : undefined;
-    return this.coursesService.findAll({ tenantId, category, level, search, isPublished: isPublishedBool });
+    return this.coursesService.findAll({ tenantId, category, level, search, isPublished: isPublishedBool, instructorId });
+  }
+
+  @Get('slug/:slug')
+  @ApiOperation({ summary: 'Get course by slug' })
+  findBySlug(@Param('slug') slug: string) {
+    return this.coursesService.findBySlug(slug);
+  }
+
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get courses created by current instructor' })
+  myCoruses(@Request() req: any) {
+    return this.coursesService.findAll({ instructorId: req.user.sub });
   }
 
   @Get(':id')

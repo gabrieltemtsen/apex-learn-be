@@ -12,13 +12,14 @@ export class CoursesService {
     private courseRepo: Repository<Course>,
   ) {}
 
-  async findAll(filters: { tenantId?: string; category?: string; level?: string; search?: string; isPublished?: boolean }): Promise<Course[]> {
+  async findAll(filters: { tenantId?: string; category?: string; level?: string; search?: string; isPublished?: boolean; instructorId?: string }): Promise<Course[]> {
     const where: any = {};
     if (filters.tenantId) where.tenantId = filters.tenantId;
     if (filters.category) where.category = filters.category;
     if (filters.level) where.level = filters.level;
     if (filters.search) where.title = Like(`%${filters.search}%`);
     if (filters.isPublished !== undefined) where.isPublished = filters.isPublished;
+    if (filters.instructorId) where.instructorId = filters.instructorId;
 
     return this.courseRepo.find({
       where,
