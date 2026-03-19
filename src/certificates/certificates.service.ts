@@ -39,7 +39,7 @@ export class CertificatesService {
   async verify(certificateNumber: string): Promise<Certificate> {
     const cert = await this.certRepo.findOne({
       where: { certificateNumber },
-      relations: ['user', 'course', 'tenant'],
+      relations: ['user', 'course', 'course.instructor', 'tenant'],
     });
     if (!cert) throw new NotFoundException('Certificate not found or invalid');
     return cert;
