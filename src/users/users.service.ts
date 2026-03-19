@@ -62,4 +62,16 @@ export class UsersService {
   async updatePoints(id: string, points: number) {
     await this.repo.increment({ id }, 'points', points);
   }
+
+  async findByResetToken(token: string): Promise<User | null> {
+    return this.repo.findOne({ where: { resetPasswordToken: token } });
+  }
+
+  async setResetToken(userId: string, token: string, expires: Date): Promise<void> {
+    await this.repo.update(userId, { resetPasswordToken: token, resetPasswordExpires: expires });
+  }
+
+  async clearResetToken(userId: string): Promise<void> {
+    await this.repo.update(userId, { resetPasswordToken: null as any, resetPasswordExpires: null as any });
+  }
 }

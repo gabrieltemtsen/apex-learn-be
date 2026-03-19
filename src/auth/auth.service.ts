@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
@@ -64,6 +64,51 @@ export class AuthService {
       }),
     ]);
     return { accessToken, refreshToken };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) return; // Silent — don't reveal if email exists
+
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await this.usersService.setResetToken(user.id, token, expires);
+
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    const { Resend } = require('resend');
+    const resend = new Resend(this.configService.get('RESEND_API_KEY'));
+
+    await resend.emails.send({
+      from: 'ApexLearn <noreply@apexlearn.ng>',
+      to: user.email,
+      subject: 'Reset your ApexLearn password',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#4f46e5;">Reset Your Password</h2>
+          <p>Hi ${user.firstName},</p>
+          <p>We received a request to reset your password. Click the button below to set a new one:</p>
+          <a href="${resetUrl}" style="display:inline-block;background:#4f46e5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;">Reset Password</a>
+          <p style="color:#6b7280;font-size:14px;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+          <p style="color:#6b7280;font-size:12px;">Or copy this link: ${resetUrl}</p>
+        </div>
+      `,
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByResetToken(token);
+    if (!user || !user.resetPasswordExpires) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+    if (user.resetPasswordExpires < new Date()) {
+      throw new BadRequestException('Reset token has expired');
+    }
+    const bcryptLib = require('bcryptjs');
+    const passwordHash = await bcryptLib.hash(newPassword, 10);
+    await this.usersService.update(user.id, { passwordHash });
+    await this.usersService.clearResetToken(user.id);
   }
 
   private sanitizeUser(user: User) {
