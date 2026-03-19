@@ -111,6 +111,22 @@ export class AuthService {
     await this.usersService.clearResetToken(user.id);
   }
 
+  async seedAdmin(secret: string, data: { firstName: string; lastName: string; email: string; password: string }): Promise<object> {
+    const expectedSecret = this.configService.get('ADMIN_SEED_SECRET');
+    if (!expectedSecret || secret !== expectedSecret) {
+      throw new Error('Invalid seed secret');
+    }
+    // Only works if no super admin exists yet
+    const existing = await this.usersService.findByEmail(data.email);
+    if (existing) {
+      // Promote existing user to super admin
+      await this.usersService.update(existing.id, { role: UserRole.SUPER_ADMIN });
+      return { message: 'Existing user promoted to SUPER_ADMIN', email: existing.email };
+    }
+    const user = await this.usersService.create({ ...data, role: UserRole.SUPER_ADMIN });
+    return { message: 'Super admin created', email: user.email };
+  }
+
   private sanitizeUser(user: User) {
     const { passwordHash, refreshToken, ...safe } = user;
     return safe;

@@ -13,7 +13,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 registrations per minute per IP
+  @Throttle({ default: { limit: 8, ttl: 300000 } }) // 8 registrations per 5 min per IP
   @ApiOperation({ summary: 'Register a new user' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -21,7 +21,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 login attempts per minute per IP
+  @Throttle({ default: { limit: 10, ttl: 300000 } }) // 10 attempts per 5 min per IP — blocks brute force, won't bother real users
   @ApiOperation({ summary: 'Login with email and password' })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password);
@@ -66,5 +66,13 @@ export class AuthController {
   async resetPassword(@Body() body: { token: string; password: string }) {
     await this.authService.resetPassword(body.token, body.password);
     return { message: 'Password reset successfully.' };
+  }
+
+  @Post('seed-admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Seed first super-admin (requires ADMIN_SEED_SECRET in env)' })
+  async seedAdmin(@Body() body: { secret: string; firstName: string; lastName: string; email: string; password: string }) {
+    const { secret, ...data } = body;
+    return this.authService.seedAdmin(secret, data);
   }
 }
