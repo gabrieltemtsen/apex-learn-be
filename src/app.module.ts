@@ -45,8 +45,10 @@ import { LeaderboardEntry } from './entities/leaderboard.entity';
           Assessment, AssessmentQuestion, AssessmentAttempt,
           Certificate, Subscription, LeaderboardEntry,
         ],
-        synchronize: true, // auto-create tables on startup
-        logging: false,
+        // IMPORTANT: synchronize only in development — never in production!
+        // In production, use TypeORM migrations: `npm run migration:run`
+        synchronize: configService.get('NODE_ENV') !== 'production',
+        logging: configService.get('NODE_ENV') !== 'production',
         ssl: { rejectUnauthorized: false }, // required for Supabase + Railway
         extra: {
           // Force IPv4 — prevents ENETUNREACH on IPv6-only Railway containers

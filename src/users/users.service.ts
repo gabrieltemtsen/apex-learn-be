@@ -63,6 +63,15 @@ export class UsersService {
     await this.repo.increment({ id }, 'points', points);
   }
 
+  async getTopByPoints(limit = 50): Promise<Partial<User>[]> {
+    return this.repo.find({
+      where: { isActive: true },
+      select: ['id', 'firstName', 'lastName', 'avatarUrl', 'role', 'points', 'streak', 'createdAt'],
+      order: { points: 'DESC' },
+      take: limit,
+    });
+  }
+
   async findByResetToken(token: string): Promise<User | null> {
     return this.repo.findOne({ where: { resetPasswordToken: token } });
   }
