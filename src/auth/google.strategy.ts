@@ -6,9 +6,15 @@ import { Strategy, Profile } from 'passport-google-oauth20';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private config: ConfigService) {
+    const clientID = config.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = config.get<string>('GOOGLE_CLIENT_SECRET');
+
+    // Passport's OAuth2Strategy throws at startup if clientID is missing.
+    // We provide dummy values so the API can boot even when Google OAuth isn't configured.
+    // The GoogleAuthGuard blocks the /auth/google routes unless real env vars are set.
     super({
-      clientID: config.get<string>('GOOGLE_CLIENT_ID') || '',
-      clientSecret: config.get<string>('GOOGLE_CLIENT_SECRET') || '',
+      clientID: clientID || 'DUMMY_GOOGLE_CLIENT_ID',
+      clientSecret: clientSecret || 'DUMMY_GOOGLE_CLIENT_SECRET',
       callbackURL:
         config.get<string>('GOOGLE_CALLBACK_URL') ||
         'http://localhost:3001/auth/google/callback',
@@ -16,7 +22,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  async validate(
+  validate(
     accessToken: string,
     refreshToken: string,
     profile: Profile,
