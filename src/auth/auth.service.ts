@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
@@ -13,7 +17,14 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async register(dto: { firstName: string; lastName: string; email: string; password: string; tenantId?: string; role?: UserRole }) {
+  async register(dto: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    tenantId?: string;
+    role?: UserRole;
+  }) {
     const user = await this.usersService.create(dto);
     const tokens = await this.generateTokens(user);
     await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
@@ -21,19 +32,69 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
-    const valid = await this.usersService.validatePassword(password, user.passwordHash);
+    const user = await this.usersService.findByEmail(email.toLowerCase());
+    if (!user || !user.isActive)
+      throw new UnauthorizedException('Invalid credentials');
+    if (!user.passwordHash)
+      throw new UnauthorizedException(
+        'Password login not available for this account',
+      );
+
+    const valid = await this.usersService.validatePassword(
+      password,
+      user.passwordHash,
+    );
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+
     await this.usersService.update(user.id, { lastLoginAt: new Date() });
     const tokens = await this.generateTokens(user);
     await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
     return { user: this.sanitizeUser(user), ...tokens };
   }
 
+  async loginWithGoogle(profile: {
+    googleId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string;
+  }) {
+    const email = profile.email?.toLowerCase();
+    if (!email) throw new BadRequestException('Google profile missing email');
+
+    const defaultTenantId = this.configService.get<string>('DEFAULT_TENANT_ID');
+
+    let user = await this.usersService.findByEmail(email);
+    if (!user) {
+      user = await this.usersService.create({
+        email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        avatarUrl: profile.avatarUrl,
+        tenantId: defaultTenantId,
+        passwordHash: undefined,
+        role: UserRole.LEARNER,
+      });
+    }
+
+    // Update markers + basic profile refresh
+    user = await this.usersService.update(user.id, {
+      googleId: profile.googleId,
+      isGoogleAuth: true,
+      avatarUrl: profile.avatarUrl ?? user.avatarUrl,
+      lastLoginAt: new Date(),
+    });
+
+    const tokens = await this.generateTokens(user);
+    await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+
+    return { user: this.sanitizeUser(user), ...tokens };
+  }
+
   async refresh(userId: string, refreshToken: string) {
     const user = await this.usersService.findOne(userId);
-    if (!user || !user.refreshToken) throw new UnauthorizedException('Access denied');
+    if (!user || !user.refreshToken)
+      throw new UnauthorizedException('Access denied');
     const valid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!valid) throw new UnauthorizedException('Access denied');
     const tokens = await this.generateTokens(user);
@@ -52,7 +113,12 @@ export class AuthService {
   }
 
   private async generateTokens(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get('JWT_SECRET'),
@@ -74,7 +140,8 @@ export class AuthService {
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     await this.usersService.setResetToken(user.id, token, expires);
 
-    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl =
+      this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     const { Resend } = require('resend');
@@ -111,7 +178,15 @@ export class AuthService {
     await this.usersService.clearResetToken(user.id);
   }
 
-  async seedAdmin(secret: string, data: { firstName: string; lastName: string; email: string; password: string }): Promise<object> {
+  async seedAdmin(
+    secret: string,
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+    },
+  ): Promise<object> {
     const expectedSecret = this.configService.get('ADMIN_SEED_SECRET');
     if (!expectedSecret || secret !== expectedSecret) {
       throw new Error('Invalid seed secret');
@@ -120,10 +195,18 @@ export class AuthService {
     const existing = await this.usersService.findByEmail(data.email);
     if (existing) {
       // Promote existing user to super admin
-      await this.usersService.update(existing.id, { role: UserRole.SUPER_ADMIN });
-      return { message: 'Existing user promoted to SUPER_ADMIN', email: existing.email };
+      await this.usersService.update(existing.id, {
+        role: UserRole.SUPER_ADMIN,
+      });
+      return {
+        message: 'Existing user promoted to SUPER_ADMIN',
+        email: existing.email,
+      };
     }
-    const user = await this.usersService.create({ ...data, role: UserRole.SUPER_ADMIN });
+    const user = await this.usersService.create({
+      ...data,
+      role: UserRole.SUPER_ADMIN,
+    });
     return { message: 'Super admin created', email: user.email };
   }
 

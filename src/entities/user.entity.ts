@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+  JoinColumn,
+} from 'typeorm';
 import { Tenant } from './tenant.entity';
 
 export enum UserRole {
@@ -30,8 +38,45 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column()
-  passwordHash: string;
+  // Nullable to support OAuth-based accounts (Google) without local passwords.
+  @Column({ nullable: true })
+  passwordHash: string | null;
+
+  // --- NRSA identity fields (single-tenant MVP) ---
+  // Primary org identifier. May be populated by staff directory sync or admin.
+  @Column({ unique: true, nullable: true })
+  irNumber: string | null;
+
+  @Column({ nullable: true })
+  department: string | null;
+
+  @Column({ nullable: true })
+  roleGrade: string | null;
+
+  // Manager / reporting line. Stored as IR number for easy directory alignment.
+  @Column({ nullable: true })
+  managerIrNumber: string | null;
+
+  // Location breakdown (MVP analytics + leaderboards)
+  @Column({ nullable: true })
+  locationCity: string | null;
+
+  @Column({ nullable: true })
+  locationBranch: string | null;
+
+  @Column({ nullable: true })
+  locationOutstation: string | null;
+
+  // Store bucketed value (e.g. "18-24", "25-34") to avoid collecting DOB for MVP.
+  @Column({ nullable: true })
+  ageGroup: string | null;
+
+  // Auth source markers
+  @Column({ default: false })
+  isGoogleAuth: boolean;
+
+  @Column({ nullable: true })
+  googleId: string | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.LEARNER })
   role: UserRole;
