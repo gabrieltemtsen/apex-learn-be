@@ -6,7 +6,6 @@ import {
   UseGuards,
   Req,
   HttpCode,
-  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -15,7 +14,6 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtRefreshGuard } from './jwt-refresh.guard';
-import { GoogleAuthGuard } from './google-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -78,26 +76,6 @@ export class AuthController {
     return { message: 'Password reset successfully.' };
   }
 
-  @Get('google')
-  @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Login with Google OAuth' })
-  async googleAuth() {}
-
-  @Get('google/callback')
-  @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Google OAuth callback' })
-  async googleCallback(@Req() req: any, @Res() res: any) {
-    const result = await this.authService.loginWithGoogle(req.user);
-
-    // MVP: redirect back to frontend with tokens in query.
-    // Later: switch to httpOnly cookies.
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const params = new URLSearchParams({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    });
-    res.redirect(`${frontendUrl}/auth/callback?${params.toString()}`);
-  }
 
   @Post('seed-admin')
   @HttpCode(200)

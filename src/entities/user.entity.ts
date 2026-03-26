@@ -71,12 +71,9 @@ export class User {
   @Column({ nullable: true })
   ageGroup: string | null;
 
-  // Auth source markers
-  @Column({ default: false })
-  isGoogleAuth: boolean;
-
+  // Auth0 identity
   @Column({ nullable: true })
-  googleId: string | null;
+  auth0Sub: string | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.LEARNER })
   role: UserRole;
