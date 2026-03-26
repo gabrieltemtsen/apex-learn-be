@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../entities/user.entity';
@@ -10,7 +14,21 @@ export class UsersService {
 
   async findAll(tenantId?: string) {
     const where = tenantId ? { tenantId } : {};
-    return this.repo.find({ where, select: ['id', 'firstName', 'lastName', 'email', 'role', 'avatarUrl', 'isActive', 'createdAt', 'points', 'streak'] });
+    return this.repo.find({
+      where,
+      select: [
+        'id',
+        'firstName',
+        'lastName',
+        'email',
+        'role',
+        'avatarUrl',
+        'isActive',
+        'createdAt',
+        'points',
+        'streak',
+      ],
+    });
   }
 
   async findOne(id: string) {
@@ -23,7 +41,16 @@ export class UsersService {
     return this.repo.findOne({ where: { email } });
   }
 
-  async create(data: { firstName: string; lastName: string; email: string; password?: string; passwordHash?: string; role?: UserRole; tenantId?: string }) {
+  async create(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password?: string;
+    passwordHash?: string | null;
+    role?: UserRole;
+    tenantId?: string;
+    avatarUrl?: string;
+  }) {
     const existing = await this.findByEmail(data.email);
     if (existing) throw new ConflictException('Email already registered');
     let passwordHash = data.passwordHash;
@@ -51,7 +78,8 @@ export class UsersService {
     return { message: 'User deleted' };
   }
 
-  async validatePassword(plain: string, hashed: string) {
+  async validatePassword(plain: string, hashed: string | null | undefined) {
+    if (!hashed) return false;
     return bcrypt.compare(plain, hashed);
   }
 
@@ -66,7 +94,16 @@ export class UsersService {
   async getTopByPoints(limit = 50): Promise<Partial<User>[]> {
     return this.repo.find({
       where: { isActive: true },
-      select: ['id', 'firstName', 'lastName', 'avatarUrl', 'role', 'points', 'streak', 'createdAt'],
+      select: [
+        'id',
+        'firstName',
+        'lastName',
+        'avatarUrl',
+        'role',
+        'points',
+        'streak',
+        'createdAt',
+      ],
       order: { points: 'DESC' },
       take: limit,
     });
@@ -76,11 +113,21 @@ export class UsersService {
     return this.repo.findOne({ where: { resetPasswordToken: token } });
   }
 
-  async setResetToken(userId: string, token: string, expires: Date): Promise<void> {
-    await this.repo.update(userId, { resetPasswordToken: token, resetPasswordExpires: expires });
+  async setResetToken(
+    userId: string,
+    token: string,
+    expires: Date,
+  ): Promise<void> {
+    await this.repo.update(userId, {
+      resetPasswordToken: token,
+      resetPasswordExpires: expires,
+    });
   }
 
   async clearResetToken(userId: string): Promise<void> {
-    await this.repo.update(userId, { resetPasswordToken: null as any, resetPasswordExpires: null as any });
+    await this.repo.update(userId, {
+      resetPasswordToken: null as any,
+      resetPasswordExpires: null as any,
+    });
   }
 }
