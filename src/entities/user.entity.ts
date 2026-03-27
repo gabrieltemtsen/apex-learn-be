@@ -46,35 +46,37 @@ export class User {
 
   // --- NRSA identity fields (single-tenant MVP) ---
   // Primary org identifier. May be populated by staff directory sync or admin.
-  @Column({ unique: true, nullable: true })
+  // IMPORTANT: for union types (string | null), TypeORM may infer design:type as Object.
+  // Explicitly set the DB column type for Postgres.
+  @Column({ type: 'text', unique: true, nullable: true })
   irNumber: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   department: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   roleGrade: string | null;
 
   // Manager / reporting line. Stored as IR number for easy directory alignment.
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   managerIrNumber: string | null;
 
   // Location breakdown (MVP analytics + leaderboards)
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   locationCity: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   locationBranch: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   locationOutstation: string | null;
 
   // Store bucketed value (e.g. "18-24", "25-34") to avoid collecting DOB for MVP.
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   ageGroup: string | null;
 
   // Auth0 identity
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   auth0Sub: string | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.LEARNER })
