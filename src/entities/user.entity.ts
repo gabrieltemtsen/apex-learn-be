@@ -38,8 +38,10 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  // Nullable to support OAuth-based accounts (Google) without local passwords.
-  @Column({ nullable: true })
+  // Nullable to support OAuth-based accounts (Auth0) without local passwords.
+  // IMPORTANT: for union types (string | null), TypeORM may infer design:type as Object.
+  // Explicitly set the DB column type to avoid DataTypeNotSupportedError on Postgres.
+  @Column({ type: 'text', nullable: true })
   passwordHash: string | null;
 
   // --- NRSA identity fields (single-tenant MVP) ---
