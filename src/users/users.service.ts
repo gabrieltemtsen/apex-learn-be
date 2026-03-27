@@ -41,6 +41,43 @@ export class UsersService {
     return this.repo.findOne({ where: { email } });
   }
 
+  async findByAuth0Sub(auth0Sub: string) {
+    return this.repo.findOne({ where: { auth0Sub } });
+  }
+
+  async findOrCreateAuth0User(data: {
+    auth0Sub: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    tenantId?: string;
+  }): Promise<User> {
+    // 1. Try by auth0Sub (most reliable — no email needed)
+    let user = await this.findByAuth0Sub(data.auth0Sub);
+    if (user) return user;
+
+    // 2. Try by email (link existing account)
+    if (data.email && !data.email.includes('@auth0.local')) {
+      user = await this.findByEmail(data.email);
+      if (user) {
+        await this.repo.update(user.id, { auth0Sub: data.auth0Sub });
+        return this.findOne(user.id);
+      }
+    }
+
+    // 3. Create new user (no ConflictException — guarded above)
+    const newUser = this.repo.create({
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      tenantId: data.tenantId,
+      passwordHash: null,
+      role: UserRole.LEARNER,
+      auth0Sub: data.auth0Sub,
+    });
+    return this.repo.save(newUser);
+  }
+
   async create(data: {
     firstName: string;
     lastName: string;

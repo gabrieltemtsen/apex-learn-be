@@ -35,33 +35,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: any) {
-    const sub = payload?.sub as string | undefined;
-    const email = (payload?.email as string | undefined)?.toLowerCase();
+    const auth0Sub = payload?.sub as string | undefined;
+    // Auth0 access tokens may not include email; fall back to sub-based email
+    const email = (payload?.email as string | undefined)?.toLowerCase()
+      || `${auth0Sub}@auth0.local`;
 
-    if (!sub) throw new UnauthorizedException('Invalid token');
-
-    // Find or create user
-    let user = email ? await this.usersService.findByEmail(email) : null;
+    if (!auth0Sub) throw new UnauthorizedException('Invalid token');
 
     const configuredTenantId = this.configService.get<string>('DEFAULT_TENANT_ID');
     const defaultTenantId =
       configuredTenantId || (await this.tenantsService.getOrCreateDefault());
 
-    if (!user) {
-      user = await this.usersService.create({
-        email: email || `${sub}@auth0.local`,
-        firstName: payload?.given_name || 'NRSA',
-        lastName: payload?.family_name || 'User',
-        tenantId: defaultTenantId,
-        passwordHash: null,
-        role: UserRole.LEARNER,
-      });
-    }
-
-    // Persist Auth0 subject
-    if (!user.auth0Sub || user.auth0Sub !== sub) {
-      await this.usersService.update(user.id, { auth0Sub: sub });
-    }
+    // Find or create user — handles auth0Sub, email linking, and first-time creation
+    const user = await this.usersService.findOrCreateAuth0User({
+      auth0Sub,
+      email,
+      firstName: payload?.given_name || payload?.name?.split(' ')?.[0] || 'User',
+      lastName: payload?.family_name || payload?.name?.split(' ')?.[1] || '',
+      tenantId: defaultTenantId,
+    });
 
     if (!user.isActive) throw new UnauthorizedException('User disabled');
 
