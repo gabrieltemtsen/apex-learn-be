@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import jwksRsa from 'jwks-rsa';
 import { UsersService } from '../users/users.service';
+import { TenantsService } from '../tenants/tenants.service';
 import { UserRole } from '../entities/user.entity';
 
 // Auth0-backed JWT strategy (RS256)
@@ -13,6 +14,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
+    private tenantsService: TenantsService,
   ) {
     const domain = configService.get<string>('AUTH0_DOMAIN');
     const issuer = domain ? `https://${domain}/` : undefined;
@@ -64,7 +66,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Upsert user on first login
     let user = email ? await this.usersService.findByEmail(email) : null;
 
-    const defaultTenantId = this.configService.get<string>('DEFAULT_TENANT_ID');
+    const configuredTenantId = this.configService.get<string>('DEFAULT_TENANT_ID');
+    const defaultTenantId = configuredTenantId || await this.tenantsService.getOrCreateDefault();
 
     if (!user) {
       // Create minimal user. Names may be missing depending on Auth0 scopes.
