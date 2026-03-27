@@ -38,6 +38,12 @@ export class UsersController {
     return this.usersService.findOne(req.user.sub);
   }
 
+  @Patch('me/profile')
+  @ApiOperation({ summary: 'Update my profile' })
+  updateMyProfile(@Request() req: any, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(req.user.sub, dto as any);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get user by id' })
   findOne(@Param('id') id: string) {
