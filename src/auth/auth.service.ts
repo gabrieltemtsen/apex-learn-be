@@ -52,44 +52,6 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens };
   }
 
-  async loginWithGoogle(profile: {
-    googleId: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    avatarUrl?: string;
-  }) {
-    const email = profile.email?.toLowerCase();
-    if (!email) throw new BadRequestException('Google profile missing email');
-
-    const defaultTenantId = this.configService.get<string>('DEFAULT_TENANT_ID');
-
-    let user = await this.usersService.findByEmail(email);
-    if (!user) {
-      user = await this.usersService.create({
-        email,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        avatarUrl: profile.avatarUrl,
-        tenantId: defaultTenantId,
-        passwordHash: undefined,
-        role: UserRole.LEARNER,
-      });
-    }
-
-    // Update markers + basic profile refresh
-    user = await this.usersService.update(user.id, {
-      googleId: profile.googleId,
-      isGoogleAuth: true,
-      avatarUrl: profile.avatarUrl ?? user.avatarUrl,
-      lastLoginAt: new Date(),
-    });
-
-    const tokens = await this.generateTokens(user);
-    await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
-
-    return { user: this.sanitizeUser(user), ...tokens };
-  }
 
   async refresh(userId: string, refreshToken: string) {
     const user = await this.usersService.findOne(userId);
