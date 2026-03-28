@@ -7,27 +7,31 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const isProd = process.env.NODE_ENV === 'production';
+
   // Security headers
   app.use(helmet({
     crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false, // Disabled so Swagger UI works
+    contentSecurityPolicy: isProd, // Enable CSP in production, off in dev so Swagger UI works
   }));
 
-  // CORS — allow FE origin from env, plus localhost for dev
+  // CORS — strict in production, permissive in dev
   const allowedOrigins = [
     process.env.FRONTEND_URL,
     'http://localhost:3000',
     'http://localhost:3001',
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
+      // Allow requests with no origin (server-to-server, curl, health checks)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      // Allow any vercel.app subdomain in dev/staging
-      if (origin.endsWith('.vercel.app') || origin.endsWith('.railway.app')) return callback(null, true);
-      callback(new Error('Not allowed by CORS'));
+      if (!isProd) {
+        // In dev/staging, also allow any vercel.app or railway.app subdomain
+        if (origin.endsWith('.vercel.app') || origin.endsWith('.railway.app')) return callback(null, true);
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
   });
@@ -41,29 +45,38 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger docs
-  const config = new DocumentBuilder()
-    .setTitle('ApexLearn API')
-    .setDescription('AI-Native Multi-Tenant Learning Management System')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('auth', 'Authentication')
-    .addTag('users', 'User management')
-    .addTag('tenants', 'Tenant management')
-    .addTag('courses', 'Course management')
-    .addTag('lessons', 'Lesson management')
-    .addTag('enrollments', 'Enrollment management')
-    .addTag('progress', 'Learning progress')
-    .addTag('assessments', 'Assessments & quizzes')
-    .addTag('certificates', 'Certificates')
-    .addTag('subscriptions', 'Subscriptions & billing')
-    .addTag('leaderboard', 'Leaderboard & gamification')
-    .addTag('ai', 'AI-powered features')
-    .addTag('analytics', 'Analytics & reporting')
-    .build();
+  // Swagger docs — only expose in non-production (or when explicitly enabled)
+  if (!isProd || process.env.ENABLE_SWAGGER === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('ApexLearn API')
+      .setDescription('AI-Native Multi-Tenant Learning Management System')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('auth', 'Authentication')
+      .addTag('users', 'User management')
+      .addTag('tenants', 'Tenant management')
+      .addTag('courses', 'Course management')
+      .addTag('lessons', 'Lesson management')
+      .addTag('enrollments', 'Enrollment management')
+      .addTag('progress', 'Learning progress')
+      .addTag('assessments', 'Assessments & quizzes')
+      .addTag('certificates', 'Certificates')
+      .addTag('subscriptions', 'Subscriptions & billing')
+      .addTag('leaderboard', 'Leaderboard & gamification')
+      .addTag('ai', 'AI-powered features')
+      .addTag('analytics', 'Analytics & reporting')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+    console.log(`📚 Swagger docs: http://localhost:${process.env.PORT || 3001}/api/docs`);
+  }
+
+  // Simple health check — no auth, no DB query (Railway/Vercel use this)
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (_req: any, res: any) => {
+    res.status(200).json({ status: 'ok', ts: Date.now() });
+  });
 
   const port = process.env.PORT || 3001;
   await app.listen(port);

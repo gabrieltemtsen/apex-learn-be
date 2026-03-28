@@ -85,30 +85,47 @@ export class UsersService {
     lastName: string;
     tenantId: string;
   }) {
-    // Try to find by clerkUserId first (stored in auth0Sub for compatibility)
-    let user = await this.repo.findOne({
-      where: [{ auth0Sub: dto.clerkUserId }, { email: dto.email.toLowerCase() }],
-    });
+    const email = dto.email.toLowerCase();
+    const isSyntheticEmail = email.endsWith('@clerk.local');
 
-    if (!user) {
-      user = this.repo.create({
-        auth0Sub: dto.clerkUserId, // reuse column for Clerk's user ID
-        email: dto.email.toLowerCase(),
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+    // 1. Find by Clerk user ID (fastest — always unique)
+    let user = await this.repo.findOne({ where: { auth0Sub: dto.clerkUserId } });
+    if (user) return user;
+
+    // 2. Find by real email (link existing account to Clerk)
+    if (!isSyntheticEmail) {
+      user = await this.repo.findOne({ where: { email } });
+      if (user) {
+        if (!user.auth0Sub) {
+          await this.repo.update(user.id, { auth0Sub: dto.clerkUserId });
+        }
+        return this.repo.findOne({ where: { id: user.id } }) as Promise<User>;
+      }
+    }
+
+    // 3. Create new user — handle race condition (concurrent first-login)
+    try {
+      const newUser = this.repo.create({
+        auth0Sub: dto.clerkUserId,
+        email,
+        firstName: dto.firstName && dto.firstName !== 'User' ? dto.firstName : 'User',
+        lastName: dto.lastName ?? '',
         tenantId: dto.tenantId,
         isActive: true,
         passwordHash: null,
         role: UserRole.LEARNER,
       });
-      await this.repo.save(user);
-    } else if (!user.auth0Sub) {
-      // Existing user found by email — link Clerk ID
-      user.auth0Sub = dto.clerkUserId;
-      await this.repo.save(user);
+      return await this.repo.save(newUser);
+    } catch (err: any) {
+      // Unique constraint violation — concurrent request already created the user
+      if (err?.code === '23505') {
+        const existing = await this.repo.findOne({
+          where: [{ auth0Sub: dto.clerkUserId }, { email }],
+        });
+        if (existing) return existing;
+      }
+      throw err;
     }
-
-    return user;
   }
 
   async create(data: {

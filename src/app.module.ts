@@ -45,9 +45,9 @@ import { LeaderboardEntry } from './entities/leaderboard.entity';
           Assessment, AssessmentQuestion, AssessmentAttempt,
           Certificate, Subscription, LeaderboardEntry,
         ],
-        // IMPORTANT: synchronize only in development — never in production!
-        // In production, use TypeORM migrations: `npm run migration:run`
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        // SAFE: synchronize ONLY when explicitly opted-in via env var (local dev only).
+        // Never set TYPEORM_SYNCHRONIZE=true on Railway/Vercel — use migrations instead.
+        synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
         logging: configService.get('NODE_ENV') !== 'production',
         ssl: { rejectUnauthorized: false }, // required for Supabase + Railway
         extra: {
