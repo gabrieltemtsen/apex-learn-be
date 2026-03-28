@@ -78,6 +78,39 @@ export class UsersService {
     return this.repo.save(newUser);
   }
 
+  async findOrCreateClerkUser(dto: {
+    clerkUserId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    tenantId: string;
+  }) {
+    // Try to find by clerkUserId first (stored in auth0Sub for compatibility)
+    let user = await this.repo.findOne({
+      where: [{ auth0Sub: dto.clerkUserId }, { email: dto.email.toLowerCase() }],
+    });
+
+    if (!user) {
+      user = this.repo.create({
+        auth0Sub: dto.clerkUserId, // reuse column for Clerk's user ID
+        email: dto.email.toLowerCase(),
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        tenantId: dto.tenantId,
+        isActive: true,
+        passwordHash: null,
+        role: UserRole.LEARNER,
+      });
+      await this.repo.save(user);
+    } else if (!user.auth0Sub) {
+      // Existing user found by email — link Clerk ID
+      user.auth0Sub = dto.clerkUserId;
+      await this.repo.save(user);
+    }
+
+    return user;
+  }
+
   async create(data: {
     firstName: string;
     lastName: string;
